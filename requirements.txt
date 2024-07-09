@@ -75,3 +75,4 @@ typing-extensions==4.10.0 \
     #   astroid
     #   cattrs
     #   pylint
+zipp>=3.19.1 # not directly required, pinned by Snyk to avoid a vulnerability
