@@ -1,6 +1,7 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License.
 """All the action we need during build"""
+
 import json
 import os
 import pathlib
@@ -69,6 +70,7 @@ def _update_npm_packages(session: nox.Session) -> None:
         "vscode-languageclient",
         "@types/vscode",
         "@types/node",
+        "@vscode/common-python-lsp",
     }
     package_json_path = pathlib.Path(__file__).parent / "package.json"
     package_json = json.loads(package_json_path.read_text(encoding="utf-8"))
@@ -110,14 +112,32 @@ def _setup_template_environment(session: nox.Session) -> None:
     _install_bundle(session)
 
 
-@nox.session(python="3.8")
+@nox.session(python="3.10")
 def install_bundled_libs(session):
     """Installs the libraries that will be bundled with the extension."""
     session.install("wheel")
     _install_bundle(session)
+    # Source the shared Python library from the git submodule instead of the
+    # published package so the bundled copy matches the pinned submodule commit.
+    shared_python_lib = pathlib.Path("external/vscode-common-python-lsp/python")
+    if not shared_python_lib.exists():
+        session.error(
+            f"Shared package submodule missing at {shared_python_lib}. "
+            "Run 'git submodule update --init --recursive' before building."
+        )
+    session.install(
+        "-t",
+        "./bundled/libs",
+        "--no-cache-dir",
+        "--implementation",
+        "py",
+        "--no-deps",
+        "--upgrade",
+        "./external/vscode-common-python-lsp/python",
+    )
 
 
-@nox.session(python="3.8")
+@nox.session(python="3.10")
 def setup(session: nox.Session) -> None:
     """Sets up the extension for development."""
     _setup_template_environment(session)
@@ -238,4 +258,5 @@ def update_packages(session: nox.Session) -> None:
     session.install("wheel", "pip-tools")
     _update_pip_packages(session)
     _update_readme()
-    _update_npm_packages(session)
+    if "--all" in session.posargs:
+        _update_npm_packages(session)

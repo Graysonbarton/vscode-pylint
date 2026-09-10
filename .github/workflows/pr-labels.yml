@@ -10,12 +10,19 @@ on:
 
 jobs:
   add-pr-label:
+    if: github.repository_owner == 'microsoft'
     name: 'Ensure Required Labels'
     runs-on: ubuntu-latest
     steps:
       - name: 'PR impact specified'
         uses: mheap/github-action-required-labels@v5
         with:
-          mode: exactly
+          mode: minimum
           count: 1
-          labels: 'bug, debt, feature-request, no-changelog'
+          labels: 'bug, debt, feature-request, no-changelog, dependencies'
+      - name: 'PR is mergeable'
+        uses: mheap/github-action-required-labels@v5
+        with:
+          mode: maximum
+          count: 0
+          labels: 'no-merge'

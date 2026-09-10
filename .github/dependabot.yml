@@ -1,0 +1,88 @@
+version: 2
+
+multi-ecosystem-groups:
+  dependencies:
+    schedule:
+      interval: 'weekly'
+    open-pull-requests-limit: 10
+    labels:
+      - 'dependencies'
+      - 'debt'
+      - 'no-changelog'
+
+updates:
+  # NPM, Python, and GitHub Actions dependencies are updated together.
+  - package-ecosystem: 'npm'
+    labels:
+      - 'dependencies'
+      - 'debt'
+      - 'no-changelog'
+    directory: '/'
+    patterns:
+      - '*'
+    multi-ecosystem-group: 'dependencies'
+    cooldown:
+      default-days: 7
+    ignore:
+      - dependency-name: '@types/vscode'
+      - dependency-name: '@types/node'
+      - dependency-name: 'vscode-languageclient'
+
+  - package-ecosystem: 'pip'
+    labels:
+      - 'dependencies'
+      - 'debt'
+    directories:
+      - '/'
+      - '/src/test/python_tests'
+    # Multi-ecosystem groups only support positive patterns. Keep Pylint
+    # unmatched so its updates remain standalone.
+    patterns:
+      - 'astroid'
+      - 'attrs'
+      - 'cattrs'
+      - 'colorama'
+      - 'dill'
+      - 'exceptiongroup'
+      - 'iniconfig'
+      - 'isort'
+      - 'lsprotocol'
+      - 'mccabe'
+      - 'packaging'
+      - 'platformdirs'
+      - 'pluggy'
+      - 'pygls'
+      - 'pygments'
+      - 'pyhamcrest'
+      - 'pytest'
+      - 'python-jsonrpc-server'
+      - 'tomli'
+      - 'tomlkit'
+      - 'typing-extensions'
+      - 'ujson'
+    multi-ecosystem-group: 'dependencies'
+    cooldown:
+      default-days: 7
+
+  # The shared package submodule is updated daily in a standalone PR.
+  - package-ecosystem: 'gitsubmodule'
+    labels:
+      - 'dependencies'
+      - 'debt'
+      - 'no-changelog'
+    directory: '/'
+    allow:
+      - dependency-name: 'external/vscode-common-python-lsp'
+    schedule:
+      interval: 'daily'
+    open-pull-requests-limit: 10
+
+  - package-ecosystem: 'github-actions'
+    labels:
+      - 'dependencies'
+      - 'debt'
+      - 'no-changelog'
+    directory: '/'
+    patterns:
+      - '*'
+    multi-ecosystem-group: 'dependencies'

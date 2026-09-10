@@ -1,5 +1,8 @@
 [tool.black]
 line_length = 88
+extend-exclude = '''
+src/test/python_tests/test_data/
+'''
 
 [tool.flake8]
 max-line-length = 99
@@ -29,6 +32,9 @@ multi_line_output = 3
 line_length = 99
 include_trailing_comma = true
 
+[tool.pylint.'MAIN']
+ignore-paths = ["src/test/python_tests/test_data"]
+
 [tool.pylint.'FORMAT']
 max-line-length=99
 
@@ -44,6 +50,7 @@ disable= [
     "import-error",
     "too-few-public-methods",
     "too-many-arguments",
+    "too-many-positional-arguments",
     "too-many-branches",
     "too-many-instance-attributes",
     "unspecified-encoding",

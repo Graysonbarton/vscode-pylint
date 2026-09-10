@@ -1,10 +1,10 @@
 # Pylint extension for Visual Studio Code
 
-A Visual Studio Code extension with support for the Pylint linter. This extension ships with `pylint=3.2.3`.
+A Visual Studio Code extension with support for the Pylint linter. This extension ships with `pylint=4.0.8`.
 
-> **Note**: The minimum version of Pylint this extension supports is `2.12.2`. If you are having issues with Pylint, please report it to [this issue tracker](https://github.com/pylint-dev/pylint/issues) as this extension is just a wrapper around Pylint.
+> **Note**: The minimum version of Pylint this extension supports is `3.3.0`. If you are having issues with Pylint, please report it to [this issue tracker](https://github.com/pylint-dev/pylint/issues) as this extension is just a wrapper around Pylint.
 
-This extension supports all [actively supported versions](https://devguide.python.org/#status-of-python-branches) of the `Python` language (i.e., Python >= 3.8).
+This extension supports all [actively supported versions](https://devguide.python.org/#status-of-python-branches) of the Python language.
 
 For more information on Pylint, see https://pylint.readthedocs.io/
 
@@ -40,6 +40,7 @@ There are several settings you can configure to customize the behavior of this e
 | pylint.showNotification | `off`                                                                                                                                  | Controls when notifications are shown by this extension. Accepted values are `onError`, `onWarning`, `always` and `off`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | pylint.lintOnChange     | `false`                                                                                                                                | Enable linting Python files with Pylint as you type.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
 | pylint.ignorePatterns   | `[]`                                                                                                                                   | Configure [glob patterns](https://docs.python.org/3/library/fnmatch.html) as supported by the fnmatch Python library to exclude files or folders from being linted with Pylint.                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| pylint.showScoreInStatusBar | `true`                                                                                                                             | Show the Pylint score in the VS Code status bar.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 
 The following variables are supported for substitution in the `pylint.args`, `pylint.cwd`, `pylint.path`, `pylint.interpreter` and `pylint.ignorePatterns` settings:
 
@@ -74,3 +75,25 @@ In this section, you will find some common issues you might encounter and how to
 
     -   Set the `pylint.importStrategy` setting to `useBundled` and the `pylint.path` setting to point to the custom binary of Pylint you want to use; or
     -   Install Pylint in the selected environment.
+
+## Development
+
+This extension bundles the shared [`vscode-common-python-lsp`](https://github.com/microsoft/vscode-common-python-lsp) library as a git submodule at `external/vscode-common-python-lsp`. The submodule must be initialized before installing dependencies, because `npm install` builds the shared library from it.
+
+When cloning the repository, pull the submodule at the same time:
+
+```bash
+git clone --recurse-submodules https://github.com/microsoft/vscode-pylint.git
+```
+
+If you already cloned without `--recurse-submodules`, initialize (or update) the submodule from the repository root:
+
+```bash
+git submodule update --init --recursive
+```
+
+Then install dependencies:
+
+```bash
+npm install
+```

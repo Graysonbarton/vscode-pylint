@@ -2,105 +2,90 @@
 // Licensed under the MIT License.
 
 import * as vscode from 'vscode';
-import { LanguageClient } from 'vscode-languageclient/node';
-import { registerLogger, traceError, traceLog, traceVerbose } from './common/logging';
-import { initializePython, onDidChangePythonInterpreter } from './common/python';
-import { restartServer } from './common/server';
 import {
-    checkIfConfigurationChanged,
-    getInterpreterFromSetting,
-    getWorkspaceSettings,
-    logLegacySettings,
-} from './common/settings';
-import { loadServerDefaults } from './common/setup';
-import { getLSClientTraceLevel, getProjectRoot } from './common/utilities';
-import { createOutputChannel, onDidChangeConfiguration, registerCommand } from './common/vscodeapi';
-import { registerLanguageStatusItem, updateStatus } from './common/status';
-import { PYTHON_VERSION } from './common/constants';
+    createToolContext,
+    deactivateServer,
+    getConfiguration,
+    loadServerDefaults,
+    onDidChangeConfiguration,
+    PythonEnvironmentsProvider,
+    registerCommonSubscriptions,
+    registerLogger,
+    ToolExtensionContext,
+} from '@vscode/common-python-lsp';
+import { EXTENSION_ROOT_DIR, PYLINT_TOOL_CONFIG } from './common/constants';
+import { logLegacySettings } from './common/settings';
+import { registerScoreStatusBar, updateScore, updateStatusBarVisibility } from './common/status';
 
-let lsClient: LanguageClient | undefined;
-export async function activate(context: vscode.ExtensionContext): Promise<void> {
-    // This is required to get server name and module. This should be
-    // the first thing that we do in this extension.
-    const serverInfo = loadServerDefaults();
-    const serverName = serverInfo.name;
-    const serverId = serverInfo.module;
+let toolContext: ToolExtensionContext | undefined;
 
-    // Setup logging
-    const outputChannel = createOutputChannel(serverName);
-    context.subscriptions.push(outputChannel, registerLogger(outputChannel));
-
-    const changeLogLevel = async (c: vscode.LogLevel, g: vscode.LogLevel) => {
-        const level = getLSClientTraceLevel(c, g);
-        await lsClient?.setTrace(level);
-    };
-
-    context.subscriptions.push(
-        outputChannel.onDidChangeLogLevel(async (e) => {
-            await changeLogLevel(e, vscode.env.logLevel);
-        }),
-        vscode.env.onDidChangeLogLevel(async (e) => {
-            await changeLogLevel(outputChannel.logLevel, e);
-        }),
-    );
-
-    traceLog(`Name: ${serverName}`);
-    traceLog(`Module: ${serverInfo.module}`);
-    traceVerbose(`Configuration: ${JSON.stringify(serverInfo)}`);
-
-    const runServer = async () => {
-        const projectRoot = await getProjectRoot();
-        const workspaceSetting = await getWorkspaceSettings(serverId, projectRoot, true);
-        if (workspaceSetting.interpreter.length === 0) {
-            updateStatus(vscode.l10n.t('Please select a Python interpreter.'), vscode.LanguageStatusSeverity.Error);
-            traceError(
-                'Python interpreter missing:\r\n' +
-                    '[Option 1] Select python interpreter using the ms-python.python.\r\n' +
-                    `[Option 2] Set an interpreter using "${serverId}.interpreter" setting.\r\n`,
-                `Please use Python ${PYTHON_VERSION} or greater.`,
-            );
-        } else {
-            lsClient = await restartServer(workspaceSetting, serverId, serverName, outputChannel, lsClient);
-        }
-    };
-
-    context.subscriptions.push(
-        onDidChangePythonInterpreter(async () => {
-            await runServer();
-        }),
-        registerCommand(`${serverId}.showLogs`, async () => {
-            outputChannel.show();
-        }),
-        registerCommand(`${serverId}.restart`, async () => {
-            await runServer();
-        }),
-        onDidChangeConfiguration(async (e: vscode.ConfigurationChangeEvent) => {
-            if (checkIfConfigurationChanged(e, serverId)) {
-                await runServer();
-            }
-        }),
-        registerLanguageStatusItem(serverId, serverName, `${serverId}.showLogs`),
-    );
-
-    // This is needed to inform users that they might have some legacy settings that
-    // are no longer supported. Instructions are printed in the output channel on how
-    // to update them.
-    logLegacySettings();
-
-    setImmediate(async () => {
-        const interpreter = getInterpreterFromSetting(serverId);
-        if (interpreter === undefined || interpreter.length === 0) {
-            traceLog(`Python extension loading`);
-            await initializePython(context.subscriptions);
-            traceLog(`Python extension loaded`);
-        } else {
-            await runServer();
-        }
+function registerScoreNotifications(ctx: ToolExtensionContext): void {
+    if (!ctx.lsClient) {
+        return;
+    }
+    ctx.lsClient.onNotification('pylint/score', (params: { uri: string; score: number }) => {
+        updateScore(params.uri, params.score);
+    });
+    ctx.lsClient.onNotification('pylint/lintingStarted', (params: { uri: string }) => {
+        updateScore(params.uri, undefined);
+    });
+    ctx.lsClient.onNotification('pylint/lintingFailed', (params: { uri: string }) => {
+        updateScore(params.uri, -1);
     });
 }
 
+export async function activate(context: vscode.ExtensionContext): Promise<void> {
+    const serverInfo = loadServerDefaults(EXTENSION_ROOT_DIR);
+    const outputChannel = vscode.window.createOutputChannel(serverInfo.name, { log: true });
+    context.subscriptions.push(outputChannel, registerLogger(outputChannel));
+
+    const pythonProvider = new PythonEnvironmentsProvider(PYLINT_TOOL_CONFIG);
+    context.subscriptions.push(pythonProvider);
+
+    toolContext = createToolContext({ serverInfo, outputChannel, toolConfig: PYLINT_TOOL_CONFIG, pythonProvider });
+    context.subscriptions.push({ dispose: () => toolContext?.dispose() });
+
+    // HACK: Override runServer to (1) set the lintOnChange env var dynamically so
+    // toggling the setting takes effect without a full window reload, and (2) register
+    // pylint-specific score notification handlers after each server restart.
+    // Replace with a proper post-start hook when the shared package supports one.
+    const originalRunServer = toolContext.runServer.bind(toolContext);
+    toolContext.runServer = async () => {
+        // Re-evaluate lintOnChange on each restart so runtime config changes take effect
+        if (getConfiguration('pylint').get<boolean>('lintOnChange', false)) {
+            process.env['VSCODE_PYLINT_LINT_ON_CHANGE'] = '1';
+        } else {
+            delete process.env['VSCODE_PYLINT_LINT_ON_CHANGE'];
+        }
+        await originalRunServer();
+        registerScoreNotifications(toolContext!);
+    };
+
+    registerCommonSubscriptions(context, {
+        serverInfo,
+        outputChannel,
+        toolConfig: PYLINT_TOOL_CONFIG,
+        toolContext,
+        pythonProvider,
+    });
+
+    // Pylint-specific: score status bar (separate from the shared LanguageStatusItem)
+    context.subscriptions.push(registerScoreStatusBar(PYLINT_TOOL_CONFIG.toolId, serverInfo.name));
+
+    // Pylint-specific: update status bar visibility on config change
+    context.subscriptions.push(
+        onDidChangeConfiguration(async (e: vscode.ConfigurationChangeEvent) => {
+            if (e.affectsConfiguration('pylint.showScoreInStatusBar')) {
+                updateStatusBarVisibility();
+            }
+        }),
+    );
+
+    logLegacySettings();
+
+    setImmediate(() => toolContext!.initialize(context.subscriptions));
+}
+
 export async function deactivate(): Promise<void> {
-    if (lsClient) {
-        await lsClient.stop();
-    }
+    await deactivateServer(toolContext);
 }

@@ -1,9 +1,14 @@
 # This file is used to generate requirements.txt.
 # To update requirements.txt, run the following commands.
-# Use Python 3.8 when creating the environment or using pip-tools
-# 1) pip install pip-tools
-# 2) pip-compile --generate-hashes --upgrade ./src/test/python_tests/requirements.in
+# Use `uv` with Python 3.10 (or oldest supported version https://devguide.python.org/versions/)
+# when creating the environment.
+#
+# Run following command:
+# uv pip compile --universal --python-version 3.10 --generate-hashes --upgrade -o ./src/test/python_tests/requirements.txt ./src/test/python_tests/requirements.in
 
 pytest
 PyHamcrest
 python-jsonrpc-server
+tomli==2.4.1
+typing-extensions==4.16.0
+ujson==5.13.0

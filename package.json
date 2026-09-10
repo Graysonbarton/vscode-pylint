@@ -2,7 +2,7 @@
     "name": "pylint",
     "displayName": "Pylint",
     "description": "%extension.description%",
-    "version": "2023.11.0-dev",
+    "version": "2026.7.0-dev",
     "preview": true,
     "serverInfo": {
         "name": "Pylint",
@@ -47,11 +47,14 @@
     "activationEvents": [
         "onLanguage:python",
         "workspaceContains:.pylintrc",
-        "workspaceContains:*.py"
+        "workspaceContains:*.py",
+        "onNotebook:jupyter-notebook",
+        "onNotebook:interactive"
     ],
     "main": "./dist/extension.js",
     "l10n": "./l10n",
     "scripts": {
+        "postinstall": "node ./build/postinstall.js",
         "vscode:prepublish": "npm run package",
         "compile": "webpack",
         "watch": "webpack --watch",
@@ -61,8 +64,10 @@
         "pretest": "npm run compile-tests && npm run compile",
         "lint": "eslint src --ext ts",
         "format-check": "prettier --check 'src/**/*.ts' 'build/**/*.yml' '.github/**/*.yml'",
+        "fix-format": "prettier --write src/**/*.ts build/**/*.yml .github/**/*.yml",
         "tests": "node ./out/test/ts_tests/runTest.js",
-        "vsce-package": "vsce package -o pylint.vsix"
+        "vsce-package": "vsce package -o pylint.vsix",
+        "vsce-package-pre": "vsce package -o pylint.vsix --pre-release"
     },
     "contributes": {
         "languages": [
@@ -206,6 +211,12 @@
                     ],
                     "scope": "machine",
                     "type": "string"
+                },
+                "pylint.showScoreInStatusBar": {
+                    "default": true,
+                    "markdownDescription": "%settings.showScoreInStatusBar.description%",
+                    "scope": "machine",
+                    "type": "boolean"
                 }
             }
         },
@@ -218,32 +229,38 @@
         ]
     },
     "dependencies": {
-        "@vscode/python-extension": "^1.0.5",
-        "fs-extra": "^11.2.0",
+        "@vscode/common-python-lsp": "file:external/vscode-common-python-lsp/typescript",
         "vscode-languageclient": "^8.1.0"
     },
     "devDependencies": {
         "@types/chai": "^4.3.16",
         "@types/fs-extra": "^11.0.4",
-        "@types/glob": "^8.1.0",
+        "@types/glob": "^9.0.0",
         "@types/mocha": "^10.0.6",
-        "@types/node": "16.x",
-        "@types/sinon": "^17.0.3",
+        "@types/node": "22.x",
+        "@types/sinon": "^21.0.1",
         "@types/vscode": "^1.74.0",
-        "@typescript-eslint/eslint-plugin": "^7.13.0",
-        "@typescript-eslint/parser": "^7.13.0",
-        "@vscode/test-electron": "^2.4.0",
-        "@vscode/vsce": "^2.27.0",
-        "chai": "^4.3.10",
-        "eslint": "^8.57.0",
-        "glob": "^10.4.1",
+        "@typescript-eslint/eslint-plugin": "^8.57.0",
+        "@typescript-eslint/parser": "^8.57.0",
+        "@typescript-eslint/type-utils": "^8.57.0",
+        "@typescript-eslint/scope-manager": "^8.57.0",
+        "@typescript-eslint/types": "^8.57.0",
+        "@typescript-eslint/typescript-estree": "^8.57.0",
+        "@typescript-eslint/utils": "^8.57.0",
+        "@typescript-eslint/visitor-keys": "^8.57.0",
+        "@vscode/test-electron": "^2.5.2",
+        "@vscode/vsce": "^3.7.1-1",
+        "chai": "^4.5.0",
+        "eslint": "^10.0.3",
+        "fs-extra": "^11.3.4",
+        "glob": "^13.0.6",
         "mocha": "^10.4.0",
-        "prettier": "^3.3.2",
-        "sinon": "^18.0.0",
-        "ts-loader": "^9.5.1",
+        "prettier": "^3.8.1",
+        "sinon": "^22.0.0",
+        "ts-loader": "^9.5.4",
         "typemoq": "^2.1.0",
-        "typescript": "^5.4.5",
-        "webpack": "^5.92.0",
-        "webpack-cli": "^5.1.4"
+        "typescript": "^5.9.3",
+        "webpack": "^5.110.1",
+        "webpack-cli": "^7.0.2"
     }
 }

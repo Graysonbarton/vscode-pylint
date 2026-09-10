@@ -14,6 +14,10 @@ resources:
       ref: main
       endpoint: Monaco
 
+variables:
+  - name: PythonVersion
+    value: '3.10'
+
 parameters:
   - name: publishExtension
     displayName: 🚀 Publish Extension
@@ -28,16 +32,18 @@ extends:
     buildSteps:
       - task: NodeTool@0
         inputs:
-          versionSpec: '18.17.1'
+          versionSpec: '20.19.0'
         displayName: Select Node version
 
       - task: UsePythonVersion@0
         inputs:
-          versionSpec: '3.8'
+          versionSpec: $(PythonVersion)
           addToPath: true
           architecture: 'x64'
         displayName: Select Python version
 
+      - script: git submodule update --init --recursive
+        displayName: Checkout submodules
       - script: npm ci
         displayName: Install NPM dependencies
 

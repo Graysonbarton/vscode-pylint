@@ -22,8 +22,11 @@ TIMEOUT = 10  # 10 seconds
 DOCUMENTATION_HOME = "https://pylint.readthedocs.io/en/latest/user_guide/messages"
 
 
-def test_publish_diagnostics_on_open():
-    """Test to ensure linting on file open."""
+@pytest.mark.parametrize(
+    "notify_method", ["notify_did_open", "notify_did_save"], ids=["open", "save"]
+)
+def test_publish_diagnostics_on_open_or_save(notify_method):
+    """Test to ensure linting on file open and save."""
     contents = TEST_FILE_PATH.read_text(encoding="utf-8")
 
     actual = []
@@ -39,92 +42,7 @@ def test_publish_diagnostics_on_open():
 
         ls_session.set_notification_callback(session.PUBLISH_DIAGNOSTICS, _handler)
 
-        ls_session.notify_did_open(
-            {
-                "textDocument": {
-                    "uri": TEST_FILE_URI,
-                    "languageId": "python",
-                    "version": 1,
-                    "text": contents,
-                }
-            }
-        )
-
-        # wait for some time to receive all notifications
-        done.wait(TIMEOUT)
-
-    expected = {
-        "uri": TEST_FILE_URI,
-        "diagnostics": [
-            {
-                "range": {
-                    "start": {"line": 0, "character": 0},
-                    "end": {"line": 0, "character": 0},
-                },
-                "message": "Missing module docstring",
-                "severity": 3,
-                "code": "C0114:missing-module-docstring",
-                "codeDescription": {
-                    "href": f"{DOCUMENTATION_HOME}/convention/missing-module-docstring.html"
-                },
-                "source": LINTER["name"],
-            },
-            {
-                "range": {
-                    "start": {"line": 2, "character": 6},
-                    "end": {
-                        "line": 2,
-                        "character": 7,
-                    },
-                },
-                "message": "Undefined variable 'x'",
-                "severity": 1,
-                "code": "E0602:undefined-variable",
-                "codeDescription": {
-                    "href": f"{DOCUMENTATION_HOME}/error/undefined-variable.html"
-                },
-                "source": LINTER["name"],
-            },
-            {
-                "range": {
-                    "start": {"line": 0, "character": 0},
-                    "end": {
-                        "line": 0,
-                        "character": 10,
-                    },
-                },
-                "message": "Unused import sys",
-                "severity": 2,
-                "code": "W0611:unused-import",
-                "codeDescription": {
-                    "href": f"{DOCUMENTATION_HOME}/warning/unused-import.html"
-                },
-                "source": LINTER["name"],
-            },
-        ],
-    }
-
-    assert_that(actual, is_(expected))
-
-
-def test_publish_diagnostics_on_save():
-    """Test to ensure linting on file save."""
-    contents = TEST_FILE_PATH.read_text(encoding="utf-8")
-
-    actual = []
-    with session.LspSession() as ls_session:
-        ls_session.initialize()
-
-        done = Event()
-
-        def _handler(params):
-            nonlocal actual
-            actual = params
-            done.set()
-
-        ls_session.set_notification_callback(session.PUBLISH_DIAGNOSTICS, _handler)
-
-        ls_session.notify_did_save(
+        getattr(ls_session, notify_method)(
             {
                 "textDocument": {
                     "uri": TEST_FILE_URI,
@@ -718,3 +636,128 @@ def test_enabled_setting(enabled):
         }
 
     assert_that(actual, is_(expected))
+
+
+def test_score_notification_on_open():
+    """Test to ensure score notification is sent on file open."""
+    contents = TEST_FILE_PATH.read_text(encoding="utf-8")
+
+    actual_score = None
+    with session.LspSession() as ls_session:
+        ls_session.initialize()
+
+        diagnostics_done = Event()
+        score_done = Event()
+
+        def _diag_handler(_):
+            diagnostics_done.set()
+
+        def _score_handler(params):
+            nonlocal actual_score
+            actual_score = params
+            score_done.set()
+
+        ls_session.set_notification_callback(session.PUBLISH_DIAGNOSTICS, _diag_handler)
+        ls_session.set_notification_callback(session.PYLINT_SCORE, _score_handler)
+
+        ls_session.notify_did_open(
+            {
+                "textDocument": {
+                    "uri": TEST_FILE_URI,
+                    "languageId": "python",
+                    "version": 1,
+                    "text": contents,
+                }
+            }
+        )
+
+        # wait for notifications
+        diagnostics_done.wait(TIMEOUT)
+        score_done.wait(TIMEOUT)
+
+    assert_that(actual_score, is_({"uri": TEST_FILE_URI, "score": 0.0}))
+
+
+def test_score_notification_on_save():
+    """Test to ensure score notification is sent on file save."""
+    contents = TEST_FILE_PATH.read_text(encoding="utf-8")
+
+    actual_score = None
+    with session.LspSession() as ls_session:
+        ls_session.initialize()
+
+        diagnostics_done = Event()
+        score_done = Event()
+
+        def _diag_handler(_):
+            diagnostics_done.set()
+
+        def _score_handler(params):
+            nonlocal actual_score
+            actual_score = params
+            score_done.set()
+
+        ls_session.set_notification_callback(session.PUBLISH_DIAGNOSTICS, _diag_handler)
+        ls_session.set_notification_callback(session.PYLINT_SCORE, _score_handler)
+
+        ls_session.notify_did_save(
+            {
+                "textDocument": {
+                    "uri": TEST_FILE_URI,
+                    "languageId": "python",
+                    "version": 1,
+                    "text": contents,
+                }
+            }
+        )
+
+        # wait for notifications
+        diagnostics_done.wait(TIMEOUT)
+        score_done.wait(TIMEOUT)
+
+    assert_that(actual_score, is_({"uri": TEST_FILE_URI, "score": 0.0}))
+
+
+def test_score_notification_has_correct_structure():
+    """Test to ensure score notification contains uri and score fields."""
+    contents = TEST_FILE_PATH.read_text(encoding="utf-8")
+
+    actual_score: dict = {}
+    with session.LspSession() as ls_session:
+        ls_session.initialize()
+
+        diagnostics_done = Event()
+        score_done = Event()
+
+        def _diag_handler(_):
+            diagnostics_done.set()
+
+        def _score_handler(params):
+            nonlocal actual_score
+            actual_score = params
+            score_done.set()
+
+        ls_session.set_notification_callback(session.PUBLISH_DIAGNOSTICS, _diag_handler)
+        ls_session.set_notification_callback(session.PYLINT_SCORE, _score_handler)
+
+        ls_session.notify_did_open(
+            {
+                "textDocument": {
+                    "uri": TEST_FILE_URI,
+                    "languageId": "python",
+                    "version": 1,
+                    "text": contents,
+                }
+            }
+        )
+
+        # wait for notifications
+        diagnostics_done.wait(TIMEOUT)
+        score_done.wait(TIMEOUT)
+
+    # Verify the structure of the score notification
+    assert actual_score
+    assert "uri" in actual_score
+    assert "score" in actual_score
+    assert actual_score["uri"] == TEST_FILE_URI
+    assert isinstance(actual_score["score"], (int, float))
